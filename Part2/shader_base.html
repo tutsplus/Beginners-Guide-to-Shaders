@@ -1,0 +1,45 @@
+<html>
+<head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+	<style>
+		/* We want our scene to span the entire window */
+		body { margin: 0; }
+	</style>
+</heda>
+<body>
+
+	<script>
+		//@author Omar Shehata. 2015.
+		//We are loading the Three.js library from the cdn here: http://cdnjs.com/libraries/three.js/
+		var scene;
+		var camera;
+		var renderer;
+
+		function scene_setup(){
+			//This is all code needed to set up a basic ThreeJS scene
+
+			//First we initialize the scene and our camera
+			scene = new THREE.Scene();
+			camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+
+			//We create the WebGL renderer and add it to the document
+			renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+		}
+
+		scene_setup();
+
+		//Add your code here!
+
+		
+
+		//Render everything!
+		function render() {
+			requestAnimationFrame( render );
+			renderer.render( scene, camera );
+		}
+		render();
+	</script>
+</body>
+</html>
