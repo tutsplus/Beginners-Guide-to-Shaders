@@ -1,0 +1,105 @@
+<html>
+<head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+	<style>
+		/* We want our scene to span the entire window */
+		body { margin: 0; }
+	</style>
+</head>
+<body>
+<script id="fragShader" type="shader-code">
+		uniform sampler2D tex;
+		uniform vec2 res;
+		uniform vec3 light;
+		uniform sampler2D norm;
+		void main() {
+	        vec2 pixel = gl_FragCoord.xy / res.xy;
+	        vec4 color = vec4(1.0);//solid white
+	        //Distance of the current pixel from the light position
+	        float dist = distance(gl_FragCoord.xy,light.xy);
+	        vec3 NormalVector = texture2D(norm,pixel).xyz;
+	        vec3 LightVector = vec3(light.x - gl_FragCoord.x,light.y - gl_FragCoord.y,60.0);
+	        NormalVector.x -= 0.5;
+	        NormalVector.y -= 0.5;
+	        NormalVector = normalize(NormalVector);
+	        LightVector = normalize(LightVector);
+	        
+	  
+	        if(light.z * res.x > dist){
+	          float diffuse = max(dot( NormalVector, LightVector ),0.0);
+	          float distanceFactor = (1.0 - dist/(light.z * res.x));
+	          gl_FragColor = color * diffuse * distanceFactor;
+	        } else {
+	          gl_FragColor = vec4(0.0);
+	        }
+		 }
+	</script>
+	<script>
+		//@author Omar Shehata. 2015.
+		//We are loading the Three.js library from the cdn here: http://cdnjs.com/libraries/three.js/
+		var scene;
+		var camera;
+		var renderer;
+
+		function scene_setup(){
+		  //This is all code needed to set up a basic ThreeJS scene
+
+		  //First we initialize the scene and our camera
+		  scene = new THREE.Scene();
+		  camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+
+		  //We create the WebGL renderer and add it to the document
+		  renderer = new THREE.WebGLRenderer();
+		  renderer.setSize( window.innerWidth, window.innerHeight );
+		  document.body.appendChild( renderer.domElement );
+		}
+
+		//Initialize the Threejs scene
+		scene_setup();
+
+		//Pull the shader code from the html
+		var shaderCode = document.getElementById("fragShader").innerHTML;
+
+		var textureURL = "https://raw.githubusercontent.com/OmarShehata/shadersguide-resources/master/images/blocks.JPG"
+		THREE.ImageUtils.crossOrigin = '';//Allows us to load an external image
+
+		var normalURL = "https://raw.githubusercontent.com/OmarShehata/shadersguide-resources/master/normal_maps/normal_test.jpg"
+		var normal = THREE.ImageUtils.loadTexture(normalURL);
+
+		//Load in the texture 
+		var texture = THREE.ImageUtils.loadTexture(textureURL);
+
+		//Set up the uniforms we'll send to our share
+		//More info on uniform types: http://threejs.org/docs/#Reference/Materials/ShaderMaterial
+		var uniforms = {
+		  norm: {type:'t', value:normal},
+		  light: {type:'v3', value:new THREE.Vector3()},
+		  tex : {type:'t',value:texture},//The texture
+		  res : {type: 'v2',value:new THREE.Vector2(window.innerWidth,window.innerHeight)}//Keeps the resolution
+		}
+		//We stick our shader onto a 2d plane big enough to fill the screen
+		var material = new THREE.ShaderMaterial({uniforms:uniforms,fragmentShader:shaderCode})
+		var geometry = new THREE.PlaneGeometry( 10, 10 );
+		var sprite = new THREE.Mesh( geometry,material );
+		//Add it to the scene
+		scene.add( sprite );
+		//Move the camera back so we can see it
+		camera.position.z = 2;
+
+		uniforms.light.value.z = 0.6;//Our radius
+
+		//Render everything!
+		function render() {
+		  requestAnimationFrame( render );
+		  renderer.render( scene, camera );
+		}
+		render();
+
+		document.onmousemove = function(event){
+			//Update the light source to follow our mouse
+			uniforms.light.value.x = event.clientX; 
+			uniforms.light.value.y = window.innerHeight - event.clientY; 
+		}
+	</script>
+</body>
+</html>
