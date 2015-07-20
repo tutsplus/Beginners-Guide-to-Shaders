@@ -60,10 +60,11 @@
 		//Pull the shader code from the html
 		var shaderCode = document.getElementById("fragShader").innerHTML;
 
-		var textureURL = "https://raw.githubusercontent.com/OmarShehata/shadersguide-resources/master/images/blocks.JPG"
-		THREE.ImageUtils.crossOrigin = ''; //Allows us to load an external image
+		var textureURL = "https://raw.githubusercontent.com/tutsplus/Beginners-Guide-to-Shaders/master/Part3/images/blocks.JPG"
+		THREE.ImageUtils.crossOrigin = '';//Allows us to load an external image
 
-		var normalURL = "https://raw.githubusercontent.com/OmarShehata/shadersguide-resources/master/normal_maps/blocks_normal.JPG"
+		var normalURL = "https://raw.githubusercontent.com/tutsplus/Beginners-Guide-to-Shaders/master/Part3/normal_maps/blocks_normal.JPG"
+
 		var normal = THREE.ImageUtils.loadTexture(normalURL);
 
 		//Load in the texture 
