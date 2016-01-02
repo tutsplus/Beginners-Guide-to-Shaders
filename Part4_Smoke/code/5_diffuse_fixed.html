@@ -1,0 +1,146 @@
+<html>
+<head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+	<style>
+		/* We want our scene to span the entire window */
+		body { margin: 0; }
+	</style>
+</head>
+<body>
+	<script id="fragShader" type="shader-code">
+		uniform vec2 res;//The width and height of our screen
+		uniform sampler2D bufferTexture;//Our input texture
+		uniform vec3 smokeSource;//The x,y are the posiiton. The z is the power/density
+		void main() {
+	        vec2 pixel = gl_FragCoord.xy / res.xy;
+	        gl_FragColor = texture2D( bufferTexture, pixel );
+
+	        //Get the distance of the current pixel from the smoke source
+	        float dist = distance(smokeSource.xy,gl_FragCoord.xy);
+	        //Generate smoke when mouse is pressed
+	        gl_FragColor.rgb += smokeSource.z * max(15.0-dist,0.0);
+
+	         //Smoke diffuse
+	        float xPixel = 1.0/res.x;//The size of a single pixel
+	        float yPixel = 1.0/res.y;
+	        vec4 rightColor = texture2D(bufferTexture,vec2(pixel.x+xPixel,pixel.y));
+	        vec4 leftColor = texture2D(bufferTexture,vec2(pixel.x-xPixel,pixel.y));
+	        vec4 upColor = texture2D(bufferTexture,vec2(pixel.x,pixel.y+yPixel));
+	        vec4 downColor = texture2D(bufferTexture,vec2(pixel.x,pixel.y-yPixel));
+	        //Handle the bottom boundary
+		 	if(pixel.y <= yPixel){
+		 		downColor.rgb = vec3(0.0);
+		 	}
+			//Diffuse equation
+	        gl_FragColor.rgb += 8.0 * 0.016 * (leftColor.rgb + rightColor.rgb + downColor.rgb * 3.0 + upColor.rgb - 6.0 * gl_FragColor.rgb);
+		 }
+	</script>
+	<script>
+		//@author Omar Shehata. 2015.
+		//We are loading the Three.js library from the cdn here: http://cdnjs.com/libraries/three.js/
+		var scene;
+		var camera;
+		var renderer;
+
+		function scene_setup(){
+			//This is the basic scene setup
+			scene = new THREE.Scene();
+			var width = window.innerWidth;
+			var height = window.innerHeight;
+			//Note that we're using an orthographic camera here rather than a prespective
+			camera = new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, 1, 1000 );
+			camera.position.z = 2;
+
+			renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+		}
+
+		
+		//Initialize the Threejs scene
+		scene_setup();
+		
+		
+		var bufferScene;
+		var textureA;
+		var textureB;
+		var bufferMaterial;
+		var plane;
+		var bufferObject;
+		var finalMaterial;
+		var quad;
+
+		function buffer_texture_setup(){
+			//Create buffer scene
+			bufferScene = new THREE.Scene();
+			//Create 2 buffer textures
+			textureA = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+			textureB = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+			//Pass textureA to shader
+			bufferMaterial = new THREE.ShaderMaterial( {
+				uniforms: {
+				 bufferTexture: { type: "t", value: textureA },
+				 res : {type: 'v2',value:new THREE.Vector2(window.innerWidth,window.innerHeight)},//Keeps the resolution
+				 smokeSource: {type:"v3",value:new THREE.Vector3(0,0,0)}///This keeps the position of the mouse and whether it was clicked or not
+				},
+				fragmentShader: document.getElementById( 'fragShader' ).innerHTML
+			} );
+			plane = new THREE.PlaneBufferGeometry( window.innerWidth, window.innerHeight );
+			bufferObject = new THREE.Mesh( plane, bufferMaterial );
+			bufferScene.add(bufferObject);
+
+			//Draw textureB to screen 
+			finalMaterial =  new THREE.MeshBasicMaterial({map: textureB});
+			quad = new THREE.Mesh( plane, finalMaterial );
+			scene.add(quad);
+		}
+		buffer_texture_setup();
+
+
+		//Send position of smoke source with value
+		var mouseDown = false;
+		function UpdateMousePosition(X,Y){
+			var mouseX = X;
+		  	var mouseY = window.innerHeight - Y;
+		  	bufferMaterial.uniforms.smokeSource.value.x = mouseX;
+		  	bufferMaterial.uniforms.smokeSource.value.y = mouseY;
+		}
+		document.onmousemove = function(event){
+		  	UpdateMousePosition(event.clientX,event.clientY)
+		}
+
+		document.onmousedown = function(event){
+			mouseDown = true;
+			bufferMaterial.uniforms.smokeSource.value.z = 0.1;
+		}
+		document.onmouseup = function(event){
+			mouseDown = false;
+			bufferMaterial.uniforms.smokeSource.value.z = 0;
+		}
+
+
+		//Render everything!
+		function render() {
+
+		  requestAnimationFrame( render );
+		  
+		   //Draw to textureB
+		  renderer.render(bufferScene,camera,textureB,true);
+			
+		  //Swap textureA and B
+		  var t = textureA;
+		  textureA = textureB;
+		  textureB = t;
+		  quad.material.map = textureB;
+		  bufferMaterial.uniforms.bufferTexture.value = textureA;
+
+		  //Finally, draw to the screen
+		  renderer.render( scene, camera );
+
+		}
+		render();
+
+
+	</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<html>
+<head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+	<style>
+		/* We want our scene to span the entire window */
+		body { margin: 0; }
+	</style>
+</head>
+<body>
+	<script id="fragShader" type="shader-code">
+		uniform vec2 res;//The width and height of our screen
+		void main() {
+	        vec2 pixel = gl_FragCoord.xy / res.xy;
+	        gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+
+		 }
+	</script>
+	<script>
+		//@author Omar Shehata. 2015.
+		//We are loading the Three.js library from the cdn here: http://cdnjs.com/libraries/three.js/
+		var scene;
+		var camera;
+		var renderer;
+
+		function scene_setup(){
+			//This is the basic scene setup
+			scene = new THREE.Scene();
+			var width = window.innerWidth;
+			var height = window.innerHeight;
+			//Note that we're using an orthographic camera here rather than a prespective
+			camera = new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, 1, 1000 );
+			camera.position.z = 2;
+
+			renderer = new THREE.WebGLRenderer();
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+		}
+
+		
+		//Initialize the Threejs scene
+		scene_setup();
+		
+		//Create our shader material
+		var material = new THREE.ShaderMaterial({
+			uniforms: {
+			 res : {type: 'v2',value:new THREE.Vector2(window.innerWidth,window.innerHeight)}//Keeps the resolution
+			},
+			fragmentShader: document.getElementById( 'fragShader' ).innerHTML
+		})
+		var geometry = new THREE.PlaneBufferGeometry( window.innerWidth, window.innerHeight);
+		var quad = new THREE.Mesh( geometry,material );
+		scene.add(quad);
+
+		//Render everything!
+		function render() {
+
+		  requestAnimationFrame( render );
+		  renderer.render( scene, camera );
+		}
+		render();
+
+
+	</script>
+</body>
+</html>
