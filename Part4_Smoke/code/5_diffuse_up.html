@@ -20,9 +20,6 @@
 	        //Generate smoke when mouse is pressed
 	        gl_FragColor.rgb += smokeSource.z * max(15.0-dist,0.0);
 
-	        gl_FragColor.r -= gl_FragColor.r / 2.0;
-
-
 	         //Smoke diffuse
 	        float xPixel = 1.0/res.x;//The size of a single pixel
 	        float yPixel = 1.0/res.y;
@@ -32,16 +29,13 @@
 	        vec4 downColor = texture2D(bufferTexture,vec2(pixel.x,pixel.y-yPixel));
 	        
 			//Diffuse equation
-			float factor = 14.0 * 0.016 * (leftColor.r + rightColor.r + downColor.r + upColor.r - 4.0 * gl_FragColor.r);
-			//We have to account for the low precision of texels
-			//In other words, when the factor gets too small, and you try to increment the color by that, it will round down
-			//and increment by 0, so it will get stuck
-			//Try commenting out the next two lines and see for yourself!
-			float minimum = 0.003;
+	        float factor = 8.0 * 0.016 * (leftColor.r + rightColor.r + downColor.r * 3.0 + upColor.r - 6.0 * gl_FragColor.r);
+		 
+	        //Account for low precision of texels
+	        float minimum = 0.003;
 			if(factor >= -minimum && factor < 0.0) factor = -minimum;
-			if(factor < minimum && factor > 0.0) factor = minimum;
 
-	        gl_FragColor.rgb += factor;
+			gl_FragColor.rgb += factor;
 		 }
 	</script>
 	<script>
