@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Smoke Shader Algorithm - Explanation Demo</title>
+	<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+	<style type="text/css">
+		#canvas {
+			border: 1px dashed #000;
+			display: inline-block;
+		}
+		#control-box {
+			border: 1px dashed #000;
+			display: inline-block;
+			vertical-align: top;
+			min-width: 100px;
+		}
+		#line {
+			border-top: 1px solid #848484;
+			width: 70%;
+		}
+		.helpertext {
+			width: 200px;
+			display: inline-block;
+		}
+		.ctrl_btn {
+			vertical-align: top!important;
+			margin-right: 20px;
+			margin-top: 20px;
+		}
+		.invertcolor_btn {
+			color:#FFF!important;
+			background-color: #6B6868!important;
+		}
+
+	</style>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+	<link rel="stylesheet" href="../lib/bootstrap-slider.min.css"></style>
+	<script type="text/javascript" src="../lib/bootstrap-slider.min.js"></script>
+</head>
+<body>
+	<center>
+		<!-- Title Text -->
+		<div class="helper-text">
+			<h1>Smoke Shader Algorithm</h1>
+			<h2>An interactive demo of a fluid dynamics algorithm</h2>
+			<p>Based on the paper by <a href="http://www.dgp.toronto.edu/people/stam/reality/Research/pdf/GDC03.pdf">Jon Stam</a> and explained on <a href="http://gamedevelopment.tutsplus.com/series/a-beginners-guide-to-coding-graphics-shaders--cms-834">Tuts+</a></p></br>
+			<h4>Click on any cell to increase the smoke density.</h4>
+		</div>
+		<!-- Canvas Rendering -->
+		<canvas id="canvas" width="800" height="500">This browser is not supported (for some reason). Please use a newer browser!</canvas>
+		<!-- Controls -->
+		<div id="control-box">
+			<h3>Controls</h3>
+			<hr id="line">
+			<div class="helpertext">
+				<h4>Display Mode</h4>
+				<span>Display cell values as text or as color</span>
+			</div>
+			<button class="btn btn-default ctrl_btn" id="displaymode-btn">Text</button></br>
+			<div class="helpertext">
+				<h4>Spread factor</h4>
+				<input id="spreadSlider" data-slider-id='spreadSlider' type="text" data-slider-min="0.0001" data-slider-step="0.0001" data-slider-max="0.21"  />
+				<span>Controls how fast it dissipates</span>
+			</div>
+			
+			</br>
+			<div class="helpertext">
+				<h4>Timestep</h4>
+				<input id="timeSlider" data-slider-id='timeSlider' type="text" data-slider-min="0" data-slider-step="1" data-slider-max="60"  />
+				<span>Control the speed of the simulation</span>
+			</div>
+			</br>
+			<div class="helpertext">
+				<h4>Step</h4>
+				<span>Manually control the timestep. Click to go to the next step</span>
+			</div>
+			<button class="btn btn-default ctrl_btn" id="next-btn">Next</button></br>
+			<div class="helpertext">
+				<h4>Horizontal Spread</h4>
+				<input id="horizontalSlider" data-slider-id='horizontalSlider' type="text" data-slider-min="0.5" data-slider-step="0.01" data-slider-max="2"  />
+				<span>Values less than 1 dissipate to the left, and more than 1 dissipate to the right.</span>
+			</div>
+			</br>
+			<div class="helpertext">
+				<h4>Verical Spread</h4>
+				<input id="verticalSlider" data-slider-id='verticalSlider' type="text" data-slider-min="0.5" data-slider-step="0.01" data-slider-max="2"  />
+				<span>Less than 1 dissipates up, otherwise down</span>
+			</div>
+			</br>
+			<div class="helpertext">
+				<h4>Color Weight</h4>
+				<input id="colorSlider" data-slider-id='colorSlider' type="text" data-slider-min="1" data-slider-step="0.01" data-slider-max="100"  />
+				<span>Multiply the color value by a factor. Does not affect the actual cell values, only the color. </span>
+			</div>
+			</br>
+			<div class="helpertext">
+				<h4>Toggle Grid</h4>
+				<span>Shows/hides the grid</span>
+			</div>
+			<button class="btn btn-default ctrl_btn" id="grid-btn">On</button></br>
+			<div class="helpertext">
+				<h4>Cell Size</h4>
+				<input id="cellSlider" data-slider-id='cellSlider' type="text" data-slider-min="10" data-slider-step="1" data-slider-max="100"  />
+				<span>Make the cells bigger or smaller</span>
+			</div>
+			</br>
+			<button class="btn btn-danger ctrl_btn" id="reset-btn">Reset Configuration</button>
+
+			
+		</div>
+		
+	</center>
+	<script type="text/javascript">
+		$(function() {
+			//Control variables
+			var displayMode = "color";
+			var spreadFactor = 0.1;
+			var timestep = 1;
+			var hFactor = 1;//Horizontal factor
+			var vFactor = 1;//Vertical factor
+			var colorWeight = 1;
+			var showGrid = true;
+			var cellSize = 73;
+
+
+
+			var width =  $("#canvas").width();
+			var height = $("#canvas").height();
+			var ctx = $('#canvas')[0].getContext("2d");
+			var gameloopCounter = timestep;
+
+			var gridData = [];
+			
+			//Note on handling the boundary condition
+			//This can be a little tricky, since the boundary can't diffuse anywhere
+			//The way I deal with it here is by extending the grid by 2 rows and columns, and offsetting everything so there's always one row and column on each side that's inaccessible but can absorb the diffuse
+
+			function initGrid(){
+				var W = Math.ceil(width/cellSize);
+				var H = Math.ceil(height/cellSize);
+				//Seed values with 0
+				for(var row=0;row<W+2;row++){//The +2 offset takes care of the boundary, see note above
+					gridData.push([]);
+					for(var col=0;col<H+2;col++){//The +2 offset takes care of the boundary, see note above
+						gridData[row].push(0);
+					}
+				}
+				//Set center value to 100
+				var centerRow = Math.floor(W/2);
+				var centerCol = Math.floor(H/2);
+				gridData[centerRow][centerCol] = 1;
+			}
+			
+
+			function roundToTwo(num) {    
+			    return Math.round(num *100) / 100;
+			}
+
+
+			function DrawGrid(){
+				//Draw the lines
+				if(showGrid){
+					ctx.beginPath();
+					for(var row=0;row<gridData[0].length;row++){
+						ctx.moveTo(0,row*cellSize);
+						ctx.lineTo(cellSize*gridData.length,row*cellSize);
+					}
+					for(var col=0;col<gridData.length;col++){
+						ctx.moveTo(col*cellSize,0);
+						ctx.lineTo(col*cellSize,cellSize*gridData[0].length);
+					}
+					ctx.closePath();
+					ctx.stroke();
+				}
+
+				//Set the font size
+				var fontSize = ((cellSize - 10) / 90) * (23-5)+5//Font goes from 5px to 23 px
+				ctx.font = 'bold '+String(fontSize)+'px sans-serif';
+				console.log(fontSize)
+				ctx.fillStyle = "#000000";
+				ctx.textAlign = "center";
+
+				//Draw the colored squares or numbers
+				for(var row=0;row<gridData.length;row++){
+					for(var col=0;col<gridData[0].length;col++){
+						var value = roundToTwo(gridData[row][col] * 100);
+						if(displayMode == "color"){
+							ctx.fillStyle = "rgba(0,0,0,"+String(Math.min(gridData[row][col]*colorWeight,1))+")";
+							ctx.fillRect((row-1)*cellSize, (col-1)*cellSize,cellSize,cellSize);///The +1 offset is taking care of the boundary, see note at the top of code
+						}
+						else if(displayMode == "text"){
+							ctx.fillText(String(value), cellSize/2+(row-1)*cellSize, cellSize/2+(col-1)*cellSize);///The +1 offset is taking care of the boundary, see note at the top of code
+						}
+						
+					}
+				}
+				
+			}
+
+			
+			function diffuse_simple(){
+				//This is the diffuse function described on page 5 of http://www.dgp.toronto.edu/people/stam/reality/Research/pdf/GDC03.pdf
+				//Apply diffuse algorithm
+				var W = gridData.length;
+				var H = gridData[0].length;
+				//Create a copy of the array, so we're not editing the grid while looping through it
+				var newGrid = [];
+				for(var i=0;i<gridData.length;i++) newGrid[i] = gridData[i].slice(0)
+				var f = spreadFactor;
+				var extraFactor = (Math.max(hFactor,1/hFactor)*Math.max(vFactor,1/vFactor) - 1)/3 * 0.4 + 1;
+				//What does extraFactor do?
+					//If we're getting an extra bit from one of the neighbouring cells (using vFactor and hFactor), we need to subtract an extra bit 
+					//from the current cell, otherwise the simulation will blow upd
+					//This extra factor is pretty eyeballed, but it goes from 1 to 1.4 depending on how big vFactor and hFactor are.
+				
+				for(var r=1;r<W-1;r++){
+					for(var c=1;c<H-1;c++){
+						newGrid[r][c] += f * (hFactor* gridData[r-1][c] + (1/hFactor)*gridData[r+1][c] + vFactor*gridData[r][c-1] + (1/vFactor) * gridData[r][c+1] - 4 * gridData[r][c]* extraFactor );
+					}
+				}
+				gridData = newGrid;
+			}
+
+			function diffuse_advanced(){
+				//This is the diffuse function described on page 6 of http://www.dgp.toronto.edu/people/stam/reality/Research/pdf/GDC03.pdf
+				//Apply diffuse algorithm
+				var W = Math.ceil(width/cellSize);
+				var H = Math.ceil(height/cellSize);
+				//Create a copy of the array, so we're not editing the grid while looping through it
+				var newGrid = [];
+				for(var i=0;i<gridData.length;i++) newGrid[i] = gridData[i].slice(0)
+				var f = 0.016;
+
+				for(var k=0;k<20;k++){
+					for(var r=1;r<W-1;r++){
+						for(var c=1;c<H-1;c++){
+							newGrid[r][c] = (gridData[r][c] + f * (newGrid[r-1][c] + newGrid[r+1][c] + newGrid[r][c-1] + newGrid[r][c+1])) / (1+4*f)
+						}
+					}
+				}
+				
+				gridData = newGrid;
+			}
+
+			var diffuseFunction = diffuse_simple;
+			//You can use the diffuse_advanced instead by uncommenting the following line
+			//Note: The diffuse_advanced does not take into account the variables in the sliders
+			//diffuseFunction = diffuse_advanced;
+
+
+			function renderLoop(){
+				//Run game logic in a variable timestep
+				gameloopCounter --;
+				if(gameloopCounter < 0 && timestep >= 0){
+					gameloopCounter = timestep;
+					diffuseFunction()
+				}
+
+				//Clear screen
+				ctx.clearRect(0, 0, width, height);
+
+				//Draw all the things
+				DrawGrid();
+
+				//Request browser to redraw when possible
+				requestAnimationFrame(renderLoop);
+			}
+
+			initGrid();
+		 	renderLoop();
+
+		 	//////////////////////////////All the code below merely takes care of the sliders and controls
+		 	//Initialize sliders and controls
+		 	var spreadSlider = $('#spreadSlider').slider({value:spreadFactor}).data("slider");
+		 	var timeSlider = $('#timeSlider').slider({
+		 		value:60/timestep,
+		 		formatter: function(value) {
+					return  value + " fps";
+				}
+		 	}).data("slider");
+		 	var hSlider = $('#horizontalSlider').slider({value:hFactor}).data("slider");
+		 	var vSlider = $('#verticalSlider').slider({value:vFactor}).data("slider");
+		 	var colorSlider = $('#colorSlider').slider({value:colorWeight}).data("slider");
+		 	var cellSlider = $('#cellSlider').slider({value:cellSize}).data("slider");
+
+			//Display mode
+			$('#displaymode-btn').html(displayMode);
+
+			$('#displaymode-btn').click(function(){
+				if(displayMode == "color") {
+					displayMode = "text";
+					$('#displaymode-btn').toggleClass("invertcolor_btn",false)
+				} else {
+					displayMode = "color";
+					$('#displaymode-btn').toggleClass("invertcolor_btn",true)
+
+				}
+				$('#displaymode-btn').html(displayMode);
+			})
+			//Spread factor slider
+			$("#spreadSlider").on("slide", function(slideEvt) {
+				spreadFactor = slideEvt.value;
+			});
+			//Time factor slider
+			$("#timeSlider").on("slide", function(slideEvt) {
+				if(slideEvt.value == 0){
+					timestep = -1;
+				} else {
+					timestep = 60/slideEvt.value;
+				}
+				
+			});
+			//Next step button
+			$('#next-btn').click(function(){
+				timestep = -1;
+				//Set time slider to 0
+				timeSlider.setValue(0);
+				diffuseFunction();
+			})
+			//Horizontal/vertical sliders
+			$('#horizontalSlider').on("slide",function(slideEvt){
+				hFactor = slideEvt.value;
+			})
+			$('#verticalSlider').on("slide",function(slideEvt){
+				vFactor = slideEvt.value;
+			})
+			//Color Weight
+			$('#colorSlider').on("slide",function(slideEvt){
+				colorWeight = slideEvt.value;
+			})
+
+			//Cell Size
+			$('#cellSlider').on("slide",function(slideEvt){
+				cellSize = slideEvt.value;
+				gridData = []
+				initGrid()
+			})
+			//Toggle grid
+			$('#grid-btn').click(function(){
+				showGrid = !showGrid;
+				if(showGrid) $('#grid-btn').html("On"); else $('#grid-btn').html("Off");
+			})
+
+			$('#reset-btn').click(function(){
+				//Reset everything
+				displayMode = "text"; $('#displaymode-btn').toggleClass("invertcolor_btn",false); $('#displaymode-btn').html(displayMode);
+				spreadFactor = 0.1; spreadSlider.setValue(spreadFactor)
+				timestep = 1; timeSlider.setValue(60/timestep)
+				hFactor = 1; hSlider.setValue(hFactor);
+				vFactor = 1; vSlider.setValue(vFactor);
+				colorWeight = 1; colorSlider.setValue(colorWeight)
+				showGrid = true; $('#grid-btn').html("On");
+				cellSize = 73; cellSlider.setValue(cellSize)
+				gridData = []
+				initGrid()
+			})
+
+			function getMousePos(evt) {
+				var canvas = $('#canvas')[0];
+				//Obtained from http://www.html5canvastutorials.com/advanced/html5-canvas-mouse-coordinates/
+		        var rect = canvas.getBoundingClientRect();
+		        return {
+		          x: evt.clientX - rect.left,
+		          y: evt.clientY - rect.top
+		        };
+		      }
+
+			//Get mouse coordinates when click in canvas
+			$('#canvas')[0].addEventListener('mouseup',function(evt){
+				var mouse = getMousePos(evt)
+				var cellX = Math.floor(mouse.x / cellSize);
+				var cellY = Math.floor(mouse.y / cellSize);
+				gridData[cellX+1][cellY+1] = 1;///The +1 offset is taking care of the boundary, see note at the top of code
+			})
+
+		});
+	</script>
+</body>
+</html>
